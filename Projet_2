@@ -1,0 +1,88 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation 
+from matplotlib.patches import Circle
+import pandas as pd
+
+LES PARAMETRES
+G = 6.674e-11 # Masse de la Terre
+A = 1 # Aire de la surface transversale
+M = 5.972e24 # Masse de la Terre
+m = 1000 # Masse du satellite
+C = 2.2 # Coefficient de traînée
+H = 50e3 # Hauteur d'échelle
+Re = 6371e3 # 
+h = 500e3 # Altitude initiale en m
+rho = 1.2e-8 # Densité atmosphérique initiale
+pas = 1 # Pas d'itération du premier 
+pas_t = 0.1 # Pas d'itération du second
+
+PLAGES DES TEMPS 
+plage = np.arange(0,7200)
+plage_t = np.arange(0,7200,0.1)
+TABLEAUX DES RESULTATS
+y = np.empty((len(plage),4), dtype=object)
+y_t = np.empty((len(plage_t),4), dtype=object)
+r = 6871e3 
+Plage_C = np.arange(1.8, 2.8, 0.2)
+Plage_C
+VALEURS INITIALES 
+y[0,:] = np.array([ Re + h , 0, 0 , np.sqrt(G*M/(r**3)) ])
+y_t[0,:] = np.array([ Re + h , 0 , 0 , np.sqrt(G*M/(r**3)) ])
+DEFINITION DES EQUATIONS DIFFERENTIELLES EN FONCTION 
+def f(t,y,G,M,rho,C,Re,H,A,m):
+    if y is None or len(y) < 4 : 
+        raise ValueError("Le vecteur y est incomplet")
+    f = [ y[1],
+          y[0]*(y[3]**2) - (G*M/(y[0]**2)) - (C*(rho*np.exp(-(y[0]- Re)/H))*A*y[1]*np.sqrt( y[1]**2 + (y[1]*y[3])**2 ) / (2*m)),
+          y[3],
+          (-2*y[1]*y[3]/y[0]) - (C*(rho*np.exp(-(y[0]- Re)/H)*A*y[3]*np.sqrt( y[1]**2 + (y[0]*y[3])**2 )/(2*m)))]
+    return f
+IMPLEMENTATION DE LA METHODE DE RUNGE KUTTA 4
+for i in range(len(plage) - 1 ):
+    k1 = np.array(f( plage[i] , y[i,:],G,M,rho,C,Re,H,A,m))
+    k2 = np.array(f( plage[i] + (0.5 * pas) , y[i,:] + (0.5 * k1),G,M,rho,C,Re,H,A,m ))
+    k3 = np.array(f( plage[i] + (0.5 * pas)  , y[i,:] + (0.5 * k2),G,M,rho,C,Re,H,A,m ))
+    k4 = np.array(f( plage[i] +  pas , y[i,:] + pas*k3 ,G,M,rho,C,Re,H,A,m ))
+    
+    y[i + 1,:] = y[i,:] + (pas/6)*(k1 + 2*k2 + 2*k3 + k4)
+colonnes = ['r','dr/dt','theta','dtheta/dt']
+df = pd.DataFrame(y,columns=colonnes)
+df
+TRACE DE LA COURBE h=f(t) AVEC h = r(t) - Re AU FIL DU TEMPS
+h = y[:,0] - Re 
+
+fig, ax = plt.subplots()
+ax.plot(plage, h , linewidth=1.5, color = "red")
+ax.set_xlabel("Temps ")
+ax.set_ylabel("Courde h=f(t)")
+VARIATION DU COEFFICIENT DE TRAINEE Cd
+tableau_h = np.empty((len(plage),len(Plage_C)), dtype=object)
+
+for k in range(len(Plage_C)):
+    for i in range(len(plage) - 1 ):
+      k1 = np.array(f( plage[i] , y[i,:],G,M,rho,Plage_C[k],Re,H,A,m))
+      k2 = np.array(f( plage[i] + (0.5 * pas) , y[i,:] + (0.5 * k1),G,M,rho,Plage_C[k],Re,H,A,m ))
+      k3 = np.array(f( plage[i] + (0.5 * pas)  , y[i,:] + (0.5 * k2),G,M,rho,Plage_C[k],Re,H,A,m ))
+      k4 = np.array(f( plage[i] +  pas , y[i,:] + pas*k3 ,G,M,rho,Plage_C[k],Re,H,A,m ))
+      
+      y[i + 1,:] = y[i,:] + (pas/6)*(k1 + 2*k2 + 2*k3 + k4)   
+
+    h = y[:,0] - Re 
+    tableau_h[:,k] = h
+    
+df = pd.DataFrame(tableau_h)
+df
+TRACE DE h = f(t) LORSQUE Cd VARIE
+
+fig, ax = plt.subplots()
+ax.plot(plage, tableau_h[:,0] , linewidth=1.5, color = "black",label = "C=1.8")
+ax.plot(plage, tableau_h[:,1] , linewidth=1.5, color = "red",label = "C=2")
+ax.plot(plage, tableau_h[:,2] , linewidth=1.5, color = "blue",label = "C=2.2")
+ax.plot(plage, tableau_h[:,3] , linewidth=1.5, color = "cyan", label = "C=2.4")
+ax.plot(plage, tableau_h[:,4] , linewidth=1.5, color = "yellow", label = "C=2.6")
+ax.legend()
+ax.set_xlabel("Temps ")
+ax.set_ylabel("Courde h=f(t)")
+ax.set_title("Variation de la trainée Cd")
+GENERATION D'UNE COURBE 2D DECRIVANT LE MOUVEMENT ORBITALE AUTOUR DE LA TERRE
